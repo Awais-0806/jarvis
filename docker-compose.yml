@@ -1,0 +1,176 @@
+# Jarvis - cloud deployment (Railway)
+#
+# What this file is for
+#   A four-service stack: edge (public), ui (SPA + token-injecting API proxy), core (FastAPI +
+#   CrewAI), ollama (local models). It deliberately has NO voice, NO tool-* containers, NO
+#   Squid proxy and NO hostlink network: none of those can work on a cloud host.
+#
+# Differences from docker-compose.yml (local)
+#   - No secrets: blocks. Railway has no /run/secrets, so CORE_API_TOKEN comes from the
+#     environment. core and ui both read the same value (core validates it, ui injects it).
+#   - IS_CLOUD=true: /api/host/* is not registered and the agent loses the host tools.
+#   - The edge listens on $PORT (Railway injects it); the template is rendered at start-up.
+#   - Bind mounts are replaced by named volumes.
+#   - No HTTP(S)_PROXY: Railway egress is direct.
+#
+# Usage (local check of the cloud shape)
+#   $env:CORE_API_TOKEN = "local-cloud-test-token"
+#   docker compose -f docker-compose.cloud.yml up --build
+#
+# Usage (Railway)
+#   Create a Compose service from the repo with this file, then set the variables below.
+#   Attach a persistent volume to `core` at /data and to `ollama` at /models if Railway does
+#   not create the named volumes automatically. Models are not baked into the image; run once:
+#       docker compose -f docker-compose.cloud.yml exec ollama \
+#         sh -c "ollama pull qwen2.5:7b && ollama pull llama3.2:3b && ollama pull nomic-embed-text"
+#
+# Required variables
+#   CORE_API_TOKEN   Shared bearer token. Generate a long random value; both core and ui use it.
+# Optional variables
+#   PORT (Railway sets it), MANAGER_MODEL, WORKER_MODEL, EMBED_MODEL, BRIEFING_*, OLLAMA_MEM_LIMIT.
+#   CORE_UPSTREAM / UI_UPSTREAM: edge proxy targets, default core:8000 and ui:8080. Set these if
+#   the platform exposes services under different DNS names (e.g. core.railway.internal:8000).
+
+name: jarvis-cloud
+
+x-hardened: &hardened
+  user: "10001:10001"
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+services:
+  # ---------------------------------------------------------------------------------------
+  # Ollama: local inference. It must reach the internet once to pull models, so this stack
+  # has no internal-only network. Railway memory must fit the models you pull.
+  # ---------------------------------------------------------------------------------------
+  ollama:
+    <<: *hardened
+    image: ollama/ollama:latest
+    mem_limit: ${OLLAMA_MEM_LIMIT:-6g}
+    memswap_limit: ${OLLAMA_MEM_LIMIT:-6g}
+    environment:
+      OLLAMA_HOST: "0.0.0.0:11434"
+      OLLAMA_MODELS: /models
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_KEEP_ALIVE: 10m
+      OLLAMA_NOHISTORY: "1"
+      HOME: /tmp
+    volumes:
+      - ollama_models:/models
+    tmpfs:
+      - /tmp:size=1g
+    expose:
+      - "11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------------------
+  # Core API + CrewAI. No host bridge on cloud: IS_CLOUD removes /api/host/* and host tools.
+  # ---------------------------------------------------------------------------------------
+  core:
+    <<: *hardened
+    build:
+      context: ./jarvis-core
+      dockerfile: Dockerfile
+    image: jarvis-core:local
+    mem_limit: ${CORE_MEM_LIMIT:-2g}
+    memswap_limit: ${CORE_MEM_LIMIT:-2g}
+    environment:
+      IS_CLOUD: "true"
+      # Read by app.main._load_api_token when /run/secrets does not exist.
+      CORE_API_TOKEN: ${CORE_API_TOKEN:?CORE_API_TOKEN must be set (shared by core and ui)}
+      OLLAMA_URL: http://ollama:11434
+      MANAGER_MODEL: ${MANAGER_MODEL:-qwen2.5:7b}
+      WORKER_MODEL: ${WORKER_MODEL:-llama3.2:3b}
+      EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
+      # Persistent state lives on the jarvis_data volume.
+      CREWAI_STORAGE_DIR: /data/crewai
+      CHROMA_PERSIST_DIR: /data/chroma
+      BRIEFING_SCHEDULER_ENABLED: ${BRIEFING_SCHEDULER_ENABLED:-true}
+      BRIEFING_TIMEZONE: ${BRIEFING_TIMEZONE:-UTC}
+      BRIEFING_HOUR: ${BRIEFING_HOUR:-8}
+      BRIEFING_MINUTE: ${BRIEFING_MINUTE:-0}
+      JARVIS_OPS_DB: ${JARVIS_OPS_DB:-/data/operations.db}
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp/.cache
+    volumes:
+      - jarvis_data:/data
+    tmpfs:
+      - /tmp:size=256m
+    expose:
+      - "8000"
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------------------
+  # React UI: serves the SPA and proxies /api/* to core, injecting the bearer token.
+  # ---------------------------------------------------------------------------------------
+  ui:
+    <<: *hardened
+    build:
+      context: ../jarvis-ui-react
+      dockerfile: Dockerfile
+    image: jarvis-ui-react:local
+    mem_limit: 128m
+    memswap_limit: 128m
+    environment:
+      # docker-entrypoint.sh falls back to this when the secret file is absent.
+      CORE_API_TOKEN: ${CORE_API_TOKEN:?CORE_API_TOKEN must be set (shared by core and ui)}
+    tmpfs:
+      - /tmp:size=128m
+    expose:
+      - "8080"
+    depends_on:
+      core:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------------------
+  # Public edge. Listens on $PORT so Railway can route to it unchanged.
+  # The stock nginx entrypoint would render into a read-only /etc/nginx/conf.d, so we run our
+  # own render step and point nginx at /tmp/nginx.conf.
+  # ---------------------------------------------------------------------------------------
+  edge:
+    <<: *hardened
+    image: nginx:1.27-alpine
+    mem_limit: 64m
+    memswap_limit: 64m
+    environment:
+      PORT: ${PORT:-8080}
+      # Override these if the platform's service DNS differs (e.g. *.railway.internal).
+      CORE_UPSTREAM: ${CORE_UPSTREAM:-core:8000}
+      UI_UPSTREAM: ${UI_UPSTREAM:-ui:8080}
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    volumes:
+      - ./nginx.cloud.conf.template:/etc/nginx/templates/nginx.conf.template:ro
+    tmpfs:
+      - /tmp:size=64m
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        envsubst '$${PORT} $${CORE_UPSTREAM} $${UI_UPSTREAM}'
+        < /etc/nginx/templates/nginx.conf.template > /tmp/nginx.conf &&
+        exec nginx -c /tmp/nginx.conf -g 'daemon off;'
+    depends_on:
+      - ui
+      - core
+
+volumes:
+  jarvis_data:
+  ollama_models:
