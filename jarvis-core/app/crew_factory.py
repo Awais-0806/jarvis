@@ -66,6 +66,10 @@ MAX_EXECUTION_S = 840
 MAX_OUTPUT_TOKENS = 700
 MAX_REPLY_CHARS = 20_000  # ChatJobResponse.reply max_length
 CONTEXT_WINDOW_TOKENS = 4096
+
+# Cloud deployment (Railway): no Windows laptop, no host bridge. The host tools are removed
+# from the crew so the model cannot offer desktop control or WhatsApp it cannot deliver.
+IS_CLOUD = os.environ.get("IS_CLOUD", "false").strip().lower() == "true"
  
 # Pitch pipeline budget. Two LLM calls share one 900 s job: each agent is capped so that
 # retrieval + match + pitch finish before the job store abandons the job.
@@ -155,7 +159,10 @@ def _host_bridge_url() -> str:
 
 
 def _host_token() -> str:
-    """Read the token compose mounts as /run/secrets/host_token (or the .txt source file)."""
+    """Read the token compose mounts as /run/secrets/host_token (or the .txt source file).
+
+    ``HOST_TOKEN`` from the environment is the fallback for deployments without secret files.
+    """
     secrets_dir = Path(os.environ.get("SECRETS_DIR", "/run/secrets"))
     for name in ("host_token", "host_token.txt"):
         try:
@@ -164,6 +171,9 @@ def _host_token() -> str:
             continue
         if token:
             return token
+    token = (os.environ.get("HOST_TOKEN") or "").strip()
+    if token:
+        return token
     raise RuntimeError("host control is not configured (host_token is missing)")
 
 
@@ -883,8 +893,14 @@ def _kickoff(message: str) -> str:
             "Strategist. Delegate specialist work to the right teammate instead of guessing. "
             "Your tools include `fetch_global_tenders` (from `global_tenders.py`) which you MUST use "
             "when the CEO asks for global, UK, US, or EU tenders. You also have access to Etimad scrapers. "
-            "You can control the CEO's Windows laptop with `control_host_computer` and send "
-            "WhatsApp messages with `send_whatsapp_message`."
+            + (
+                "This cloud deployment has no laptop bridge: you cannot control a desktop, take "
+                "screenshots, type on the host, or send WhatsApp messages. If asked, say that "
+                "these actions need the local host bridge."
+                if IS_CLOUD
+                else "You can control the CEO's Windows laptop with `control_host_computer` and send "
+                     "WhatsApp messages with `send_whatsapp_message`."
+            )
         ),
         backstory=(
             "You are Jarvis, a highly professional and concise Chief of Staff for a CEO. "
@@ -895,13 +911,19 @@ def _kickoff(message: str) -> str:
             "Answer directly and clearly without repeating task instructions. "
             "Your tools include `fetch_global_tenders` (from `global_tenders.py`) which you MUST use "
             "when the CEO asks for global, UK, US, or EU tenders. You also have access to Etimad scrapers. "
-            "You have direct access to the CEO's Windows laptop via the host bridge. You can open apps "
-            "(e.g., 'code', 'chrome'), type text, press hotkeys (e.g., 'win+d'), take screenshots, "
-            "and get system stats. When the CEO asks you to do something on the computer, use this tool. "
-            "You can send WhatsApp messages through the laptop, but delivery is unconfirmed: never "
-            "say a message was delivered unless the tool reports it was dispatched and even then "
-            "say delivery is unconfirmed. "
-            "Your team: delegate finance, expense or invoice work to the Finance Manager; CV, "
+            + (
+                "There is no laptop bridge in this cloud deployment: you cannot open apps, type, "
+                "press hotkeys, take screenshots, read host stats or send WhatsApp. Never claim "
+                "you did. "
+                if IS_CLOUD
+                else "You have direct access to the CEO's Windows laptop via the host bridge. You can open apps "
+                     "(e.g., 'code', 'chrome'), type text, press hotkeys (e.g., 'win+d'), take screenshots, "
+                     "and get system stats. When the CEO asks you to do something on the computer, use this tool. "
+                     "You can send WhatsApp messages through the laptop, but delivery is unconfirmed: never "
+                     "say a message was delivered unless the tool reports it was dispatched and even then "
+                     "say delivery is unconfirmed. "
+            )
+            + "Your team: delegate finance, expense or invoice work to the Finance Manager; CV, "
             "candidate or interview work to the HR Manager; LinkedIn posts and marketing copy to "
             "the Content Strategist. Use search_memory before answering questions about earlier "
             "emails, tenders or briefings, and save important facts with save_memory_note. "
@@ -910,7 +932,13 @@ def _kickoff(message: str) -> str:
             f"When the CEO greets you, introduce yourself exactly like this: {GREETING_REPLY}"
         ),
         llm=llm,
-        tools=[*build_crewai_tools(), global_tool, host_tool, whatsapp_tool, *memory_tools],
+        tools=[
+            *build_crewai_tools(),
+            global_tool,
+            # Cloud has no host bridge: leave the host tools out of the prompt entirely.
+            *([] if IS_CLOUD else [host_tool, whatsapp_tool]),
+            *memory_tools,
+        ],
         # Delegation is what makes the specialists reachable: CrewAI adds the "Delegate work to
         # coworker" tool for an agent with allow_delegation=True and passes the crew's agents.
         allow_delegation=True,
@@ -930,7 +958,7 @@ def _kickoff(message: str) -> str:
             "Manager. CV screening or interview slots -> delegate to the HR Manager. LinkedIn "
             "posts or marketing copy -> delegate to the Content Strategist. Earlier emails, "
             "tenders or briefings -> search_memory with the matching context (email, tender or "
-            "briefing). Handle tenders, pitches and laptop control yourself.\n"
+            "briefing). Handle tenders and pitches yourself.\n"
             "When you delegate, give the specialist the exact facts it needs (amounts, currency, "
             "client, role, CV text). Relay its result faithfully, including any warning that "
             "something was not sent, not connected, or only a heuristic."

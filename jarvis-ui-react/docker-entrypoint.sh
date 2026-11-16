@@ -9,25 +9,28 @@ TOKEN_FILE="${CORE_TOKEN_FILE:-/run/secrets/core_api_token}"
 TEMPLATE="/etc/nginx/templates/jarvis.conf.template"
 OUT="/tmp/nginx.conf"
 
-if [ ! -r "$TOKEN_FILE" ]; then
-    echo "[jarvis-ui] FATAL: cannot read $TOKEN_FILE (mount the core_api_token secret)" >&2
-    exit 1
+# Local Docker mounts the token file; cloud platforms (Railway) inject CORE_API_TOKEN as an
+# environment variable instead. The file wins when both exist.
+ENV_TOKEN="${CORE_API_TOKEN:-}"
+CORE_API_TOKEN=""
+if [ -r "$TOKEN_FILE" ]; then
+    # Strip CR/LF (the secret is often edited on Windows) and one layer of surrounding quotes
+    # (a value pasted as "token" would otherwise close nginx's own quoted string and break the
+    # config). Core only .strip()s the same file, so a quoted secret must not reach this proxy.
+    CORE_API_TOKEN="$(tr -d '\r\n' < "$TOKEN_FILE" | sed -e 's/^"\(.*\)"$/\1/')"
+elif [ -n "$ENV_TOKEN" ]; then
+    CORE_API_TOKEN="$(printf '%s' "$ENV_TOKEN" | tr -d '\r\n' | sed -e 's/^"\(.*\)"$/\1/')"
 fi
 
-# Strip CR/LF (the secret is often edited on Windows) and one layer of surrounding quotes
-# (a value pasted as "token" would otherwise close nginx's own quoted string and break the
-# config). Core only .strip()s the same file, so a quoted secret must not reach this proxy.
-CORE_API_TOKEN="$(tr -d '\r\n' < "$TOKEN_FILE" | sed -e 's/^"\(.*\)"$/\1/')"
-
 if [ -z "$CORE_API_TOKEN" ]; then
-    echo "[jarvis-ui] FATAL: $TOKEN_FILE is empty" >&2
+    echo "[jarvis-ui] FATAL: no API token. Mount $TOKEN_FILE or set CORE_API_TOKEN." >&2
     exit 1
 fi
 
 # Anything nginx could mis-parse inside a quoted header (spaces, quotes, backslashes, $, ;)
 # is rejected here with a clear message rather than as an "unexpected ..." syntax error.
 if ! printf '%s' "$CORE_API_TOKEN" | grep -Eq '^[A-Za-z0-9._~-]+$'; then
-    echo "[jarvis-ui] FATAL: $TOKEN_FILE contains characters that are unsafe in nginx.conf" >&2
+    echo "[jarvis-ui] FATAL: the API token contains characters that are unsafe in nginx.conf" >&2
     echo "[jarvis-ui]        Allowed: A-Z a-z 0-9 . _ ~ - (no quotes, spaces, CR/LF or \$)" >&2
     exit 1
 fi

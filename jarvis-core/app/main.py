@@ -92,6 +92,10 @@ from .schemas import (
 
 APP_VERSION = "0.1.0"
 
+# Cloud deployment (Railway): there is no Windows laptop and no host bridge, so the
+# /api/host/* routes are not registered at all and the agent loses the host tools.
+IS_CLOUD = os.environ.get("IS_CLOUD", "false").strip().lower() == "true"
+
 # Voice service (compose service ``voice``; backend network only). The proxy keeps the
 # browser from needing a second token and gives the UI one consistent API surface.
 VOICE_URL = os.environ.get("VOICE_URL", "http://voice:8000").rstrip("/")
@@ -112,12 +116,17 @@ def _secrets_dir() -> Path:
  
  
 def _load_api_token() -> str | None:
-    """Read the API token on each call so a rotated secret takes effect without a restart."""
+    """Read the API token on each call so a rotated secret takes effect without a restart.
+
+    Local Docker mounts ``/run/secrets/core_api_token``. On a cloud platform (Railway) there
+    are no secret files, so ``CORE_API_TOKEN`` from the environment is the fallback. The file
+    wins when both exist.
+    """
     try:
         token = (_secrets_dir() / API_TOKEN_SECRET).read_text(encoding="utf-8-sig").strip()
     except OSError:
-        return None
-    return token or None
+        token = ""
+    return token or (os.environ.get("CORE_API_TOKEN") or "").strip() or None
  
  
 def require_api_token(
@@ -163,6 +172,7 @@ MAX_BRIEFING_CHARS = 12_000
 _briefing_lock = threading.Lock()
 _briefing_cache: dict[str, Any] | None = None
 _briefing_loaded = False
+_briefing_scheduler: Any = None
 
 
 class BriefingResponse(StrictModel):
@@ -175,6 +185,8 @@ class BriefingResponse(StrictModel):
     tender_count: int = 0
     tender_mode: str = "none"
     notice: str = ""
+    scheduled: bool = False
+    next_run_at: str | None = None
 
 
 def _briefing_context() -> str:
@@ -280,8 +292,19 @@ def _scheduled_briefing() -> None:
     logger.info("Scheduled briefing job %s started", job.id)
 
 
+def _scheduler_status() -> tuple[bool, str | None]:
+    """(running, next run ISO) for the briefing job; (False, None) when disabled."""
+    scheduler = _briefing_scheduler
+    if scheduler is None or not getattr(scheduler, "running", False):
+        return False, None
+    job = scheduler.get_job("morning-briefing")
+    next_run = getattr(job, "next_run_time", None)
+    return True, next_run.isoformat(timespec="seconds") if next_run else None
+
+
 def _start_briefing_scheduler() -> Any:
     """Start APScheduler, or return None when disabled/unavailable (core keeps serving)."""
+    global _briefing_scheduler
     if not BRIEFING_SCHEDULER_ENABLED:
         logger.info("Morning briefing scheduler disabled (BRIEFING_SCHEDULER_ENABLED)")
         return None
@@ -304,6 +327,7 @@ def _start_briefing_scheduler() -> Any:
     except Exception as exc:  # noqa: BLE001 - a bad timezone must not stop the API
         logger.error("Briefing scheduler not started: %s", exc.__class__.__name__)
         return None
+    _briefing_scheduler = scheduler
     logger.info("Morning briefing scheduled for %02d:%02d %s",
                 BRIEFING_HOUR, BRIEFING_MINUTE, BRIEFING_TIMEZONE)
     return scheduler
@@ -311,12 +335,14 @@ def _start_briefing_scheduler() -> Any:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    global _briefing_scheduler
     scheduler = _start_briefing_scheduler()
     try:
         yield
     finally:
         if scheduler is not None:
             scheduler.shutdown(wait=False)
+        _briefing_scheduler = None
 
 
 app = FastAPI(
@@ -457,11 +483,18 @@ def briefing_latest() -> BriefingResponse:
     plain text.
     """
     payload = _briefing_store_load()
+    scheduled, next_run_at = _scheduler_status()
     if not payload:
-        return BriefingResponse(available=False, notice=BRIEFING_NOTICE)
+        return BriefingResponse(
+            available=False, notice=BRIEFING_NOTICE,
+            scheduled=scheduled, next_run_at=next_run_at,
+        )
     text = payload.get("text")
     if not isinstance(text, str) or not text.strip():
-        return BriefingResponse(available=False, notice=BRIEFING_NOTICE)
+        return BriefingResponse(
+            available=False, notice=BRIEFING_NOTICE,
+            scheduled=scheduled, next_run_at=next_run_at,
+        )
     try:
         tender_count = int(payload.get("tender_count") or 0)
     except (TypeError, ValueError):
@@ -473,6 +506,8 @@ def briefing_latest() -> BriefingResponse:
         text=text[:MAX_BRIEFING_CHARS],
         tender_count=tender_count,
         tender_mode=str(payload.get("tender_mode") or "mock"),
+        scheduled=scheduled,
+        next_run_at=next_run_at,
     )
 
 
@@ -663,6 +698,8 @@ def _load_host_token() -> str | None:
 
     Compose mounts the secret as ``/run/secrets/host_token`` (the secret name); running the
     stack without compose may leave the source file name, ``host_token.txt``. Accept both.
+    ``HOST_TOKEN`` from the environment is the last fallback (cloud deployments have no secret
+    files, although host routes are disabled there).
     """
     for filename in HOST_TOKEN_FILENAMES:
         try:
@@ -671,7 +708,7 @@ def _load_host_token() -> str | None:
             continue
         if token:
             return token
-    return None
+    return (os.environ.get("HOST_TOKEN") or "").strip() or None
 
 
 def _bridge_detail(response: httpx.Response) -> str | None:
@@ -752,7 +789,12 @@ def _host_request(
     return payload
 
 
-@protected.post("/api/host/whatsapp", tags=["host"])
+# Host routes live on their own router so cloud mode (IS_CLOUD=true) can omit them entirely
+# instead of merely failing at call time. They are still bearer-protected when mounted.
+host_protected = APIRouter(dependencies=[Depends(require_api_token)])
+
+
+@host_protected.post("/api/host/whatsapp", tags=["host"])
 def host_whatsapp(payload: HostWhatsAppRequest) -> dict[str, Any]:
     """Send a WhatsApp message from the laptop through the host bridge.
 
@@ -769,37 +811,44 @@ def host_whatsapp(payload: HostWhatsAppRequest) -> dict[str, Any]:
     )
 
 
-@protected.post("/api/host/type", tags=["host"])
+@host_protected.post("/api/host/type", tags=["host"])
 def host_type(payload: HostTypeRequest) -> dict[str, Any]:
     """Type text into whichever window has focus on the laptop. The text is never logged."""
     logger.info("Host type request (%d chars)", len(payload.text))
     return _host_request("POST", "/action/type", json={"text": payload.text})
 
 
-@protected.post("/api/host/hotkey", tags=["host"])
+@host_protected.post("/api/host/hotkey", tags=["host"])
 def host_hotkey(payload: HostHotkeyRequest) -> dict[str, Any]:
     """Press a key combination on the laptop, e.g. ``{"keys": ["win", "d"]}``."""
     logger.info("Host hotkey request (%d keys)", len(payload.keys))
     return _host_request("POST", "/action/hotkey", json={"keys": payload.keys})
 
 
-@protected.post("/api/host/open_app", tags=["host"])
+@host_protected.post("/api/host/open_app", tags=["host"])
 def host_open_app(payload: HostOpenAppRequest) -> dict[str, Any]:
     """Launch an application on the laptop, e.g. ``{"app_name": "code"}``."""
     logger.info("Host open_app request (%s)", payload.app_name)
     return _host_request("POST", "/action/open_app", json={"app_name": payload.app_name})
 
 
-@protected.get("/api/host/screenshot", tags=["host"])
+@host_protected.get("/api/host/screenshot", tags=["host"])
 def host_screenshot() -> dict[str, Any]:
     """Capture the laptop's main monitor. Returns ``image_base64`` (PNG) plus its size."""
     return _host_request("GET", "/screenshot", params={"monitor": 1})
 
 
-@protected.get("/api/host/stats", tags=["host"])
+@host_protected.get("/api/host/stats", tags=["host"])
 def host_stats() -> dict[str, Any]:
     """CPU, RAM and battery readings from the laptop."""
     return _host_request("GET", "/system_stats")
+
+
+# Mounted only for local runs: cloud has no laptop and no host bridge (see IS_CLOUD).
+if not IS_CLOUD:
+    protected.include_router(host_protected)
+else:
+    logger.info("Cloud mode: /api/host/* routes are disabled")
 
 
 # --- Global tenders + VIP pitch ------------------------------------------------------------------
