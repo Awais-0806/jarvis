@@ -1,0 +1,25 @@
+html {
+   --muneer-color: #1c8657;
+   --muneer-color-accent: #1faf6f6b;
+   --muneer-color-transparent: #eaf6ef;
+   --muneer-text: #414042;
+   --muneer-btn-bg: #32ad71;
+   --muneer-btn-color-hover: #32ad71;
+}
+
+.muneer-trigger-button-box.bottom-right {
+   left: 0;
+   right: auto;
+}
+
+#muneer-popup-footer {
+   display: none;
+}
+
+.muneer-switch-box .switch .slider {
+   background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzODQgNTEyIj4KICA8cGF0aCBmaWxsPSIjMWM4NjU3IiBkPSJNMzQ1IDEzN2M5LjQtOS40IDkuNC0yNC42IDAtMzMuOXMtMjQuNi05LjQtMzMuOSAwbC0xMTkgMTE5TDczIDEwM2MtOS40LTkuNC0yNC42LTkuNC0zMy45IDBzLTkuNCAyNC42IDAgMzMuOWwxMTkgMTE5TDM5IDM3NWMtOS40IDkuNC05LjQgMjQuNiAwIDMzLjlzMjQuNiA5LjQgMzMuOSAwbDExOS0xMTlMMzExIDQwOWM5LjQgOS40IDI0LjYgOS40IDMzLjkgMHM5LjQtMjQuNiAwLTMzLjlsLTExOS0xMTlMMzQ1IDEzN3oiLz4KPC9zdmc+);
+}
+
+.muneer-invisible-label {
+   display: none;
+}

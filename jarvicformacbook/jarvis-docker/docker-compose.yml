@@ -1,0 +1,324 @@
+name: jarvis
+
+# ---------------------------------------------------------------
+# Shared hardening: non-root, read-only rootfs, all caps dropped.
+# ---------------------------------------------------------------
+x-hardened: &hardened
+  user: "10001:10001"
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+# Containers that need the internet go ONLY through Squid.
+x-proxy-env: &proxy-env
+  HTTP_PROXY: http://proxy:3128
+  HTTPS_PROXY: http://proxy:3128
+  http_proxy: http://proxy:3128
+  https_proxy: http://proxy:3128
+  NO_PROXY: localhost,127.0.0.1,ollama,proxy,core,ui,voice,tool-email,tool-contracts,tool-files
+  no_proxy: localhost,127.0.0.1,ollama,proxy,core,ui,voice,tool-email,tool-contracts,tool-files
+
+services:
+  # =============================================================
+  # LOOP 1 - TESTED
+  # =============================================================
+  ollama:
+    <<: *hardened
+    image: ollama/ollama:latest   # pin to a specific tag once verified
+    # qwen2.5:7b (Q4) ~4.7 GB weights + KV cache + runtime ≈ 5.5 GB.
+    # Only one model loaded at a time (OLLAMA_MAX_LOADED_MODELS=1).
+    # The 1 GB /tmp tmpfs below also counts against this limit.
+    mem_limit: 6g
+    memswap_limit: 6g
+    environment:
+      OLLAMA_HOST: "0.0.0.0:11434"
+      OLLAMA_MODELS: /models
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_KEEP_ALIVE: 10m
+      OLLAMA_NOHISTORY: "1"
+      HOME: /tmp
+    volumes:
+      - ../data/ollama:/models
+    tmpfs:
+      - /tmp:size=1g
+    networks:
+      - backend            # internal network: no internet
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  # One-shot model puller. Run on demand:
+  #   docker compose --profile setup run --rm ollama-pull
+  # It is the ONLY container with direct internet (setup-time only, no secrets).
+  ollama-pull:
+    <<: *hardened
+    restart: "no"
+    profiles: ["setup"]
+    image: ollama/ollama:latest
+    mem_limit: 1g                  # downloads stream to disk; no model loaded
+    memswap_limit: 1g
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        ollama serve &
+        SERVE_PID=$$!
+        sleep 8
+        echo "[pull] manager: qwen2.5:7b"
+        ollama pull qwen2.5:7b
+        echo "[pull] worker: llama3.2:3b"
+        ollama pull llama3.2:3b
+        echo "[pull] embed: nomic-embed-text"
+        ollama pull nomic-embed-text
+        echo "[pull] installed models:"
+        ollama list
+        kill $$SERVE_PID
+        wait $$SERVE_PID || true
+        echo "[pull] DONE"
+    environment:
+      OLLAMA_MODELS: /models
+      OLLAMA_NOHISTORY: "1"
+      HOME: /tmp
+    volumes:
+      - ../data/ollama:/models
+    tmpfs:
+      - /tmp:size=1g
+    networks:
+      - egress
+
+  # =============================================================
+  # LATER LOOPS - defined now, NOT started in Loop 1 (profile "app")
+  # =============================================================
+  edge:
+    <<: *hardened
+    profiles: ["app"]
+    image: nginx:1.27-alpine
+    mem_limit: 64m
+    memswap_limit: 64m
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    tmpfs:
+      - /tmp:size=64m
+    depends_on:
+      - ui
+      - core
+    networks:
+      - frontend
+      - backend
+
+  proxy:
+    <<: *hardened
+    profiles: ["app"]
+    # Pinned by digest (Squid 6.13, pulled 2026-11-09). To upgrade: pull the new tag, test, then
+    # replace the digest with `docker image inspect ubuntu/squid:<tag> --format '{{index .RepoDigests 0}}'`.
+    image: ubuntu/squid:latest@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029
+    mem_limit: 128m                # cache_mem is 8 MB, no disk cache
+    memswap_limit: 128m
+    entrypoint: ["squid", "-N", "-f", "/etc/squid/squid.conf"]
+    volumes:
+      - ./squid.conf:/etc/squid/squid.conf:ro
+    tmpfs:
+      - /tmp:size=64m
+    networks:
+      - backend
+      - egress
+
+  core:
+    <<: *hardened
+    profiles: ["app"]
+    build:
+      context: ../jarvis-core      # relative to this compose file
+      dockerfile: Dockerfile
+    image: jarvis-core:local
+    # Hard RAM cap so core can never starve Ollama's model on a 16 GB host.
+    # memswap_limit = mem_limit means no extra swap beyond the cap.
+    mem_limit: 2g
+    memswap_limit: 2g
+    environment:
+      <<: *proxy-env
+      OLLAMA_URL: http://ollama:11434
+      MANAGER_MODEL: ${MANAGER_MODEL:-qwen2.5:7b}
+      WORKER_MODEL: ${WORKER_MODEL:-llama3.2:3b}
+      EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
+      SECRETS_DIR: /run/secrets
+      # Persistent state lives on the jarvis_data volume (see Dockerfile).
+      CREWAI_STORAGE_DIR: /data/crewai
+      CHROMA_PERSIST_DIR: /data/chroma
+    volumes:
+      # Named volume: ChromaDB, CrewAI SQLite memory, other app state.
+      - jarvis_data:/data
+      # Audit logs stay on the host (nested bind) so they can be reviewed
+      # and backed up outside Docker.
+      - ../data/audit:/data/audit
+    tmpfs:
+      # HOME and XDG caches point here; read-only rootfs otherwise.
+      - /tmp:size=256m
+    secrets:
+      - fernet_key
+      - core_api_token
+      - tool_email_token
+      - tool_contracts_token
+      - tool_files_token
+      - voice_token
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - backend
+
+  tool-email:
+    <<: *hardened
+    profiles: ["app"]
+    build:
+      context: ../jarvis-tools/email
+    mem_limit: 256m
+    memswap_limit: 256m
+    environment:
+      <<: *proxy-env
+      SECRETS_DIR: /run/secrets
+    tmpfs:
+      - /tmp:size=64m
+    secrets:
+      - fernet_key
+      - tool_email_token
+      - gmail_client_id
+      - gmail_client_secret
+    networks:
+      - backend
+
+  tool-contracts:
+    <<: *hardened
+    profiles: ["app"]
+    build:
+      context: ../jarvis-tools/contracts
+    mem_limit: 256m
+    memswap_limit: 256m
+    environment:
+      <<: *proxy-env
+      SECRETS_DIR: /run/secrets
+    tmpfs:
+      - /tmp:size=64m
+    secrets:
+      - tool_contracts_token
+      - sam_gov_api_key
+      - ted_api_key
+      - etimad_api_key
+    networks:
+      - backend
+
+  tool-files:
+    <<: *hardened
+    profiles: ["app"]
+    build:
+      context: ../jarvis-tools/files
+    mem_limit: 256m
+    memswap_limit: 256m
+    environment:
+      SECRETS_DIR: /run/secrets
+      SANDBOX_DIR: /sandbox
+    volumes:
+      - ../data/sandbox:/sandbox        # sandbox only; nothing else from the host
+    tmpfs:
+      - /tmp:size=64m
+    secrets:
+      - tool_files_token
+    networks:
+      - backend                    # no proxy env: no internet at all
+
+  voice:
+    <<: *hardened
+    profiles: ["app"]
+    build:
+      context: ../jarvis-voice
+    mem_limit: 1g                  # placeholder: revisit once the STT/TTS models are chosen
+    memswap_limit: 1g
+    environment:
+      SECRETS_DIR: /run/secrets
+      # Read-only rootfs: caches and HOME must live on the /tmp tmpfs.
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp/.cache
+    volumes:
+      - ../data/voice:/data/voice
+    tmpfs:
+      - /tmp:size=256m
+    secrets:
+      - voice_token
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - backend
+
+  ui:
+    <<: *hardened
+    profiles: ["app"]
+    build:
+      context: ../jarvis-ui
+    mem_limit: 512m
+    memswap_limit: 512m
+    environment:
+      SECRETS_DIR: /run/secrets
+      CORE_URL: http://core:8000
+    tmpfs:
+      - /tmp:size=128m
+    secrets:
+      - ui_session_secret
+      - ui_password
+      - core_api_token
+    networks:
+      - backend
+
+volumes:
+  # Created and owned by UID 10001 on first mount (ownership copied from
+  # the image's /data directory).
+  jarvis_data:
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true       # no route to the internet
+  egress:
+    driver: bridge       # used only by proxy (runtime) and ollama-pull (setup)
+
+secrets:
+  fernet_key:
+    file: ../secrets/fernet.key
+  core_api_token:
+    file: ../secrets/core_api_token.txt
+  tool_email_token:
+    file: ../secrets/tool_email_token.txt
+  tool_contracts_token:
+    file: ../secrets/tool_contracts_token.txt
+  tool_files_token:
+    file: ../secrets/tool_files_token.txt
+  voice_token:
+    file: ../secrets/voice_token.txt
+  ui_session_secret:
+    file: ../secrets/ui_session_secret.txt
+  # CEO dashboard login password. Created by hand (not by setup_secrets.py).
+  ui_password:
+    file: ../secrets/ui_password.txt
+  gmail_client_id:
+    file: ../secrets/gmail_client_id.txt
+  gmail_client_secret:
+    file: ../secrets/gmail_client_secret.txt
+  sam_gov_api_key:
+    file: ../secrets/sam_gov_api_key.txt
+  ted_api_key:
+    file: ../secrets/ted_api_key.txt
+  etimad_api_key:
+    file: ../secrets/etimad_api_key.txt

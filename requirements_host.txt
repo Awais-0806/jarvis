@@ -1,0 +1,31 @@
+# Jarvis Host Control Bridge - native Windows dependencies.
+#
+# Install on the laptop, outside Docker:
+#   pip install -r requirements_host.txt
+#
+# This is a separate environment from the containers: the bridge needs a real desktop
+# session (mouse, keyboard, screen), which a container does not have.
+
+# --- Web API ---
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.29,<1.0
+pydantic>=2.7,<3.0
+
+# --- Desktop automation ---
+# Mouse and keyboard events. Also pulls in pytweening / pyscreeze / mouseinfo.
+pyautogui>=0.9.54,<1.0
+# Screenshot capture (faster than pyautogui/PIL and supports multiple monitors).
+mss>=9.0,<11.0
+# CPU, RAM and battery readings.
+psutil>=5.9,<8.0
+
+# --- Optional but recommended ---
+# pyscreeze (used by pyautogui) needs Pillow for image handling.
+pillow>=10.0,<12.0
+# Clipboard paste path for non-ASCII text (Arabic, accented names, emoji).
+pyperclip>=1.8,<2.0
+
+# --- WhatsApp (Task 3) ---
+# Drives WhatsApp Web in the default browser to send messages. Requires a logged-in
+# web.whatsapp.com session; the bridge falls back to an honest mock when this is missing.
+pywhatkit>=5.4,<6.0

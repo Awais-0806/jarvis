@@ -1,0 +1,65 @@
+# ===============================================================
+# Jarvis .gitignore
+# ===============================================================
+
+# --- Secrets & environment (NEVER commit) ---
+secrets/
+*.key
+*.pem
+.env
+.env.*
+!.env.example
+
+# --- Runtime data, models, logs ---
+data/
+logs/
+*.log
+
+# --- Claude Code: personal/local settings (shared config in .claude/ IS committed) ---
+.claude/settings.local.json
+.claude/**/*.local.*
+CLAUDE.local.md
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# --- Generated exports ---
+*.csv
+!**/tests/fixtures/*.csv
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+# Ignore secrets
+secrets/
+.env
+.env.local
+
+# Ignore data and models
+data/
+*.sqlite
+chroma/
+ollama/
+
+# Ignore python cache
+__pycache__/
+.venv-host/
+venv/
+
+# Ignore node modules
+node_modules/
+dist/

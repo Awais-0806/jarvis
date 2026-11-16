@@ -1,0 +1,16 @@
+# Keep the build context small and free of local artefacts / secrets.
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+.venv
+venv
+.env
+*.env
+*.key
+scripts/
+# Saved browser assets of the Etimad sample page; only etimad_sample.html is used (by the tool).
+app/test/etimad_sample_files
+.git
+.gitignore
+Dockerfile
+.dockerignore

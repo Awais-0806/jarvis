@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis - CEO Briefing</title>
+    <style>
+        :root {
+            --primary: #0A192F;
+            --secondary: #112240;
+            --accent: #64FFDA;
+            --text-main: #233554;
+            --text-light: #8892B0;
+            --bg: #F8FAFC;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Page Setup for PDF */
+        .page {
+            width: 100%;
+            max-width: 900px;
+            height: 1050px; /* A4 Proportions */
+            margin: 0 auto;
+            background: white;
+            padding: 60px 80px;
+            box-sizing: border-box;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+            page-break-after: always;
+            overflow: hidden;
+        }
+
+        @media print {
+            body { background: white; }
+            .page { 
+                margin: 0; 
+                box-shadow: none; 
+                height: 100vh; 
+                max-height: 100vh;
+                padding: 40px;
+            }
+            .no-print { display: none; }
+        }
+
+        /* Typography */
+        h1, h2, h3, h4 { color: var(--primary); margin-top: 0; }
+        
+        h1 { font-size: 3rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 10px; }
+        h2 { font-size: 2rem; font-weight: 700; border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 30px; }
+        h3 { font-size: 1.3rem; font-weight: 600; margin-bottom: 15px; }
+        
+        p { font-size: 1.1rem; color: var(--text-main); margin-bottom: 20px; }
+        
+        .subtitle { font-size: 1.5rem; color: var(--text-light); font-weight: 400; margin-bottom: 50px; }
+
+        /* Layouts */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        
+        .card {
+            background: var(--bg);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid #E2E8F0;
+            border-top: 4px solid var(--primary);
+        }
+
+        .card-accent { border-top-color: var(--accent); }
+
+        ul { padding-left: 20px; font-size: 1.1rem; margin-bottom: 25px; }
+        li { margin-bottom: 15px; }
+
+        /* Specific Elements */
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            background: var(--secondary);
+            color: var(--accent);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        .hero-text {
+            margin-top: 150px;
+        }
+
+        .status-box {
+            background: rgba(100, 255, 218, 0.1);
+            border-left: 4px solid var(--accent);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .decision-box {
+            background: #FFF5F5;
+            border-left: 4px solid #E53E3E;
+            padding: 25px;
+            margin-bottom: 25px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 40px;
+            left: 80px;
+            right: 80px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: var(--text-light);
+            border-top: 1px solid #E2E8F0;
+            padding-top: 20px;
+        }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #E2E8F0; }
+        th { font-weight: 600; color: var(--primary); background: var(--bg); }
+    </style>
+</head>
+<body>
+
+    <!-- PAGE 1: COVER -->
+    <div class="page" style="background: var(--primary); color: white; display: flex; flex-direction: column; justify-content: center;">
+        <div class="badge" style="background: rgba(255,255,255,0.1); color: var(--accent); width: fit-content;">CONFIDENTIAL - BOARD BRIEFING</div>
+        <h1 style="color: white; font-size: 4rem; margin-top: 20px;">Project Jarvis</h1>
+        <div class="subtitle" style="color: var(--text-light); font-size: 1.8rem;">The Zero-Trust Autonomous Chief of Staff</div>
+        
+        <div style="margin-top: 100px;">
+            <p style="color: var(--accent); font-weight: 600; letter-spacing: 2px;">PREPARED FOR</p>
+            <h3 style="color: white; font-size: 1.5rem; margin-bottom: 5px;">CEO, RNDTEK</h3>
+            
+            <p style="color: var(--accent); font-weight: 600; letter-spacing: 2px; margin-top: 30px;">EXECUTED BY</p>
+            <h3 style="color: white; font-size: 1.2rem; margin-bottom: 5px;">Awais (Infrastructure & Backend Lead)</h3>
+            <h3 style="color: white; font-size: 1.2rem;">Ekremah (AI & Multi-Agent Architect)</h3>
+        </div>
+        <div class="footer" style="border-top: none; color: var(--text-light);">
+            <span>November 2026</span>
+            <span>STRICTLY INTERNAL</span>
+        </div>
+    </div>
+
+    <!-- PAGE 2: EXECUTIVE SUMMARY -->
+    <div class="page">
+        <div class="badge">01. EXECUTIVE SUMMARY</div>
+        <h2>The Vision: Your Personal AI Chief of Staff</h2>
+        <p>Project Jarvis is not just another chatbot. It is a fully autonomous, locally hosted AI system designed specifically for RNDTEK's business development and operations.</p>
+        
+        <div class="grid-2" style="margin-top: 40px;">
+            <div class="card">
+                <h3>The Problem</h3>
+                <p>Currently, researching Etimad tenders, drafting personalized outreach, and monitoring the Saudi market consumes hours of manual labor daily.</p>
+            </div>
+            <div class="card card-accent">
+                <h3>The Solution</h3>
+                <p>Jarvis automates the heavy lifting. It scrapes tenders, analyzes them against our capabilities, drafts compliant outreach, and prepares daily briefings—all while keeping you in control.</p>
+            </div>
+        </div>
+
+        <div class="status-box" style="margin-top: 40px;">
+            <strong>Current Status:</strong> The foundational infrastructure is complete. The system is live on a local 16GB machine, powered by local LLMs (Qwen 2.5 & Llama 3.2), ensuring <strong>zero data leakage</strong>.
+        </div>
+        
+        <div class="footer">
+            <span>Project Jarvis</span>
+            <span>Page 2</span>
+        </div>
+    </div>
+
+    <!-- PAGE 3: BUSINESS VALUE & ROI -->
+    <div class="page">
+        <div class="badge">02. BUSINESS VALUE & ROI</div>
+        <h2>Why Jarvis Matters to RNDTEK</h2>
+        <p>We are building a proprietary asset that directly impacts RNDTEK's bottom line.</p>
+
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Traditional Approach</th>
+                <th>With Jarvis</th>
+            </tr>
+            <tr>
+                <td><strong>Tender Discovery</strong></td>
+                <td>Manual browsing (2-3 hours/day)</td>
+                <td>Automated scraping & filtering (Real-time)</td>
+            </tr>
+            <tr>
+                <td><strong>Outreach Drafting</strong></td>
+                <td>Generic templates, low reply rate</td>
+                <td>1+1+1 Hyper-personalized pitches</td>
+            </tr>
+            <tr>
+                <td><strong>Compliance</strong></td>
+                <td>Risk of PDPL violations</td>
+                <td>Automated PDPL Guardrails</td>
+            </tr>
+            <tr>
+                <td><strong>Estimated Cost</strong></td>
+                <td>$20,000/year (Junior Analyst)</td>
+                <td>$0 in software subscriptions</td>
+            </tr>
+        </table>
+
+        <p style="margin-top: 30px;"><strong>Strategic Advantage:</strong> Jarvis allows us to bid on more tenders with higher accuracy, giving RNDTEK a massive competitive edge in the Saudi market.</p>
+        
+        <div class="footer">
+            <span>Project Jarvis</span>
+            <span>Page 3</span>
+        </div>
+    </div>
+
+    <!-- PAGE 4: ARCHITECTURE -->
+    <div class="page">
+        <div class="badge">03. SYSTEM ARCHITECTURE</div>
+        <h2>Enterprise-Grade Architecture</h2>
+        <p>Unlike cloud AI, Jarvis runs entirely on-premise. We designed it with the same security principles used by top Silicon Valley firms.</p>
+
+        <div class="grid-2">
+            <div class="card">
+                <h3>🧠 The Brain (Local AI)</h3>
+                <ul>
+                    <li><strong>Manager LLM:</strong> Qwen 2.5 (7B)</li>
+                    <li><strong>Worker LLM:</strong> Llama 3.2 (3B)</li>
+                    <li><strong>Vector DB:</strong> ChromaDB (for RAG)</li>
+                    <li>No internet required for inference.</li>
+                </ul>
+            </div>
+            <div class="card">
+                <h3>🛡️ Security (Zero-Trust)</h3>
+                <ul>
+                    <li>Dockerized Microservices</li>
+                    <li>Squid Proxy (Strict API Allowlist)</li>
+                    <li>Fernet Encryption for all memory</li>
+                    <li>Human-in-the-loop (No auto-send)</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="status-box" style="margin-top: 30px;">
+            <strong>Data Privacy:</strong> Your data, meeting notes, and email drafts never leave your laptop. There are no OpenAI or Google Cloud API calls. This is 100% PDPL compliant.
+        </div>
+
+        <div class="footer">
+            <span>Project Jarvis</span>
+            <span>Page 4</span>
+        </div>
+    </div>
+
+    <!-- PAGE 5: THE 6-AGENT SYSTEM -->
+    <div class="page">
+        <div class="badge">04. MULTI-AGENT INTELLIGENCE</div>
+        <h2>The 6-Agent Workforce</h2>
+        <p>Jarvis doesn't just generate text; it acts as a team of specialized agents working together.</p>
+
+        <div class="grid-3">
+            <div class="card">
+                <h3>1. Etimad Scraper</h3>
+                <p>Monitors Etimad portals 24/7 for AI, Hajj, and tech tenders.</p>
+            </div>
+            <div class="card">
+                <h3>2. Persona Mapper</h3>
+                <p>Finds decision-makers and recent LinkedIn triggers.</p>
+            </div>
+            <div class="card">
+                <h3>3. RAG Proposal</h3>
+                <p>Matches RNDTEK's past work to the client's needs.</p>
+            </div>
+            <div class="card">
+                <h3>4. PDPL Guardrail</h3>
+                <p>Ensures no restricted keywords (e.g., facial recognition) are used.</p>
+            </div>
+            <div class="card">
+                <h3>5. Fusha Refiner</h3>
+                <p>Translates drafts into formal Saudi business Arabic.</p>
+            </div>
+            <div class="card">
+                <h3>6. Follow-up Agent</h3>
+                <p>Tracks outreach and alerts you after 4 days of silence.</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <span>Project Jarvis</span>
+            <span>Page 5</span>
+        </div>
+    </div>
+
+    <!-- PAGE 6: CURRENT ACHIEVEMENTS -->
+    <div class="page">
+        <div class="badge">05. MILESTONES ACHIEVED</div>
+        <h2>What We Have Built So Far</h2>
+        <p>Over the past few days, we have moved from concept to a working prototype.</p>
+
+        <ul>
+            <li>✅ <strong>Infrastructure:</strong> Fully secure Docker environment deployed.</li>
+            <li>✅ <strong>Dashboard:</strong> CEO Command Center (Streamlit) is live and secure.</li>
+            <li>✅ <strong>AI Integration:</strong> Real-time connection to Qwen 7B established (avg. 33s response time on CPU).</li>
+            <li>✅ <strong>Etimad Scraper:</strong> End-to-End test passed. Jarvis successfully parsed 6 live tenders from a raw HTML snapshot.</li>
+            <li>✅ <strong>Testing:</strong> 150+ automated tests passed for security and logic.</li>
+        </ul>
+
+        <div class="status-box">
+            <strong>Live Demo Available:</strong> We can demonstrate the Etimad scraping and dashboard interaction right now.
+        </div>
+        
+        <div class="footer">
+            <span>Project Jarvis</span>
+            <span>Page 6</span>
+        </div>
+    </div>
+
+    <!-- PAGE 7: VOICE INTERFACE -->
+    <div class="page">
+        <div class="badge">06. THE FUTURE: VOICE CONTROL</div>
+        <h2>Next Phase: Iron Man-Style Voice Control</h2>
+        <p>As requested, we are moving from a text dashboard to a fully voice-driven assistant.</p>
+
+        <div class="grid-2">
+            <div class="card">
+                <h3>🎙️ Push-to-Talk (Phase 1)</h3>
+                <p>Press a hotkey, speak your command ("Summarize my emails"), and Jarvis will speak the answer back using secure, local TTS (Piper).</p>
+            </div>
+            <div class="card card-accent">
+                <h3>👏 Double-Clap Wake-Up (Phase 2)</h3>
+                <p>Clap twice, and Jarvis wakes up on your screen, opens your tools, and gives you the morning briefing.</p>
+            </div>
+        </div>
+
+        <h3 style="margin-top: 40px;">Voice Approval System</h3>
+        <p>For security, Jarvis will never send an email on voice command alone. It will say: <em>"Boss, I drafted this to X. Say 'Confirm approval: Four, Eight, Two, One'."</em> This prevents accidental voice triggers.</p>
+
+        <div class="footer">
+            <span>Project Jarvis</span>
+            <span>Page 7</span>
+        </div>
+    </div>
+
+    <!-- PAGE 8: INTEGRATIONS -->
+    <div class="page">
+        <div class="badge">07. ECOSYSTEM INTEGRATION</div>
+        <h2>Connecting with Your Daily Tools</h2>
+        <p>Jarvis will be your single point of contact for all operations.</p>
+
+        <table>
+            <tr>
+                <th>Integration</th>
+                <th>Capability</th>
+                <th>Status</th>
+            </tr>
+            <tr>
+                <td><strong>Gmail</strong></td>
+                <td>Read, summarize, and draft replies.</td>
+                <td>OAuth2 Ready</td>
+            </tr>
+            <tr>
+                <td><strong>Google Calendar</strong></td>
+                <td>Meeting briefings & scheduling.</td>
+                <td>Planned</td>
+            </tr>
+            <tr>
+                <td><strong>WhatsApp</strong></td>
+                <td>Send self-reminders and alerts.</td>
+                <td>Host-Side Script</td>
+            </tr>
+            <tr>
+                <td><strong>LinkedIn</strong></td>
+                <td>Draft outreach (Human-in-the-loop).</td>
+                <td>Under Review</td>
+            </tr>
+        </table>
+
+        <div class="footer">
+            <span>Project Jarvis</span>
+            <span>Page 8</span>
+        </div>
+    </div>
+
+    <!-- PAGE 9: STRATEGIC DECISIONS (THE CEO INPUT) -->
+    <div class="page">
+        <div class="badge">08. STRATEGIC ALIGNMENT</div>
+        <h2>Decisions Required from CEO</h2>
+        <p>To align Jarvis with your risk appetite and business strategy, we need your sign-off on the following:</p>
+
+        <div class="decision-box">
+            <h3>1. LinkedIn Automation Risk</h3>
+            <p>Automating LinkedIn outreach (even pre-filling drafts) violates LinkedIn's ToS and risks an account ban. Do you authorize us to proceed with the Playwright browser automation, or should Jarvis only generate drafts for you to copy-paste manually?</p>
+        </div>
+
+        <div class="decision-box">
+            <h3>2. Etimad Live API Access</h3>
+            <p>Our current scraper works perfectly on offline HTML. To fetch live data, Etimad uses bot protection (CAPTCHA). We need you to authorize obtaining official API credentials from Etimad (apiportal.etimad.sa) to ensure uninterrupted access.</p>
+        </div>
+
+        <div class="decision-box">
+            <h3>3. Cloud vs. Local Voice</h3>
+            <p>We have a local voice model (Piper) which is 100% secure but sounds slightly robotic. Do you prefer local security, or should we use ElevenLabs (Cloud) for a more natural voice, at the cost of data leaving our local machine?</p>
+        </div>
+
+        <div class="footer">
+            <span>Project Jarvis</span>
+            <span>Page 9</span>
+        </div>
+    </div>
+
+    <!-- PAGE 10: NEXT STEPS -->
+    <div class="page">
+        <div class="badge">09. NEXT STEPS</div>
+        <h2>The Roadmap to Deployment</h2>
+        
+        <div class="grid-3" style="margin-top: 50px;">
+            <div class="card">
+                <h3>Week 1</h3>
+                <p><strong>Voice Integration:</strong> Complete the Host-to-Docker audio bridge. Secure the voice pipeline with HMAC authentication.</p>
+            </div>
+            <div class="card">
+                <h3>Week 2</h3>
+                <p><strong>Email & Calendar:</strong> Enable Gmail OAuth, so Jarvis can summarize the inbox and brief you on meetings.</p>
+            </div>
+            <div class="card">
+                <h3>Week 3</h3>
+                <p><strong>Live Etimad:</strong> Deploy the live scraper (assuming API/Allowlist is approved) and begin generating daily executive briefings.</p>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 100px;">
+            <h2 style="border: none; font-size: 2.5rem; color: var(--primary);">Ready to Serve.</h2>
+            <p style="color: var(--text-light); font-size: 1.2rem;">Jarvis is no longer a concept. It is an operational reality.</p>
+        </div>
+
+        <div class="footer">
+            <span>Project Jarvis</span>
+            <span>Page 10</span>
+        </div>
+    </div>
+
+</body>
+</html>

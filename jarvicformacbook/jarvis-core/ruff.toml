@@ -1,0 +1,16 @@
+# Ruff lint config for jarvis-core (dev tool only; not installed in the image).
+target-version = "py311"
+line-length = 120
+
+[lint]
+# E/W pycodestyle, F pyflakes, I isort, B bugbear, UP pyupgrade, S bandit (security)
+select = ["E", "W", "F", "I", "B", "UP", "S"]
+ignore = [
+    "UP042",  # keep `class X(str, Enum)`: StrEnum changes str()/format() output
+]
+
+[lint.per-file-ignores]
+# pytest uses bare asserts by design.
+"tests/**" = ["S101"]
+# GateResult.PASS = "pass" is an enum value, not a password (bandit false positive).
+"app/schemas.py" = ["S105"]

@@ -1,0 +1,15 @@
+# Keep the build context small and free of local artefacts / secrets.
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+.venv
+venv
+.env
+*.env
+*.key
+*.txt.secret
+tests/
+.git
+.gitignore
+Dockerfile
+.dockerignore

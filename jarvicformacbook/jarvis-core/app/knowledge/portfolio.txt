@@ -1,0 +1,232 @@
+# SYED RAZA - FLAGSHIP INNOVATION PROJECTS
+# This document contains the details of the CEO's top projects, patents, and technical capabilities.
+
+---
+## PROJECT 1: Burj Khalifa Smart Building Platform
+**End Client:** Emaar / Burj Khalifa
+**Description:** Patent-pending smart-building intelligence platform delivered for the world's tallest building. Architected electrochromic glass IoT devices with edge ML inference that reduce projected energy consumption by 35%. Designed autonomous spider-bots for facade inspection using YOLOv8 computer vision, implemented a Hyperledger Fabric provenance layer for carbon-credit issuance, and delivered full patent documentation. Led the formal patent filing process covering IoT device architecture, blockchain data models, and AI inference pipelines.
+**Tech Stack:** Next.js, TensorFlow Lite, MQTT, Hyperledger Fabric, GCP, Kubernetes, Python, YOLOv8, PostgreSQL.
+**Key Achievements:** 35% projected energy reduction, Patent Filed.
+
+---
+## PROJECT 2: AI Calling Agent Platform (aicallagent.ai)
+**Description:** Multi-tenant AI voice SaaS platform handling 500+ concurrent conversations in production. Architected a configurable AI pipeline integrating multiple engines for real-time STT, TTS, voice cloning, multilingual support, and emotion-aware dialogue. Built custom MCP servers that let agents query databases, update CRM records, and book calendar slots inside a single conversational turn. Deployed on GCP Cloud Run with autoscaling and observability.
+**Tech Stack:** Next.js, FastAPI, Vapi, OpenAI, ElevenLabs, Deepgram, Twilio, GCP Cloud Run, PostgreSQL, Redis, Pinecone, MCP Servers.
+**Key Achievements:** 500+ concurrent conversations, 95%+ speech-to-text accuracy, Patent Filed.
+
+---
+## PROJECT 3: Black Cab Innovation Platform
+**End Client:** Licensed London Taxi Industry
+**Description:** Patent-pending digital transformation of London's iconic Black Cab industry. Designed an intelligent fleet-management and passenger-experience platform combining real-time AI dispatch optimisation, dynamic surge pricing, and in-cab personalised services. Built a voice-enabled AI assistant for drivers using LLM-backed natural language interfaces that provide live route optimisation, regulatory updates, and earnings intelligence. Prototyped a passenger app with AR wayfinding and a contextual city-guide.
+**Tech Stack:** React Native, Mapbox, AR.js, Vapi, ElevenLabs, GCP, TensorFlow, Redis, PostgreSQL.
+**Key Achievements:** Patent Filed for adaptive AI dispatch.
+
+---
+## PROJECT 4: Xila — Calendar Manager Agent
+**Description:** A voice-powered calendar assistant that responds to 'Hello Xila' (like Siri's 'Hey Siri'). Add and remove appointments, set reminders, and list your calendar using natural speech. Xila asks for missing details (time, day, name) when needed. Features wake-phrase detection, slot-filling conversation, real-time audio streaming, and both local JSON storage and browser localStorage fallback.
+**Tech Stack:** OpenAI Whisper, GPT-4o-mini, OpenAI TTS-HD, Real-time audio streaming.
+
+---
+## PROJECT 5: HSBC FRM Risk & Treasury (Enterprise)
+**Description:** Cloud-based Finance Resource Management risk and treasury systems for a global bank, delivered on Google Cloud. Kept data consistent across 30+ regions, with event-driven ingestion through Pub/Sub, Dataflow and BigQuery to reconcile financial datasets. Added a RAG pipeline over the regulatory knowledge base so LLM agents could answer compliance queries with citations, and Vertex AI workbenches for analyst-led ML experimentation.
+**Tech Stack:** GCP, Vertex AI, BigQuery, Dataflow, Kubernetes, Terraform.
+
+---
+## PROJECT 6: HSBC Business Banking Apps (Enterprise)
+**Description:** Business Banking iOS and Android apps, delivered within the Commercial Banking Platform and Digital Transformation programme. Integrated Alexa so customers could hear account summaries by voice. Hardened the apps with certificate pinning, RASP and jailbreak protection, SAML single sign-on through Ping Federate, and biometric identity management.
+**Tech Stack:** React Native, SAML, Ping Federate, iOS, Android.
+
+---
+## PROJECT 7: Nationwide Banking Framework (Enterprise)
+**Description:** A pluggable enterprise banking framework for cross-platform applications. Authored a custom API layer that added WebSocket and SignalR real-time messaging to Sencha 6, packaged Cordova plugins for native device features, and designed ADFS3 OAuth 2.0 authentication.
+**Tech Stack:** Sencha, Cordova, ADFS3, OAuth 2.0.
+
+---
+## PROJECT 8: Computershare Dividend Tracker (Enterprise)
+**Description:** A real-time Dividend Tracker portal and Investor Dashboard for a global share-registry provider. Built in React and TypeScript on Azure and AWS, with NLP-powered automation for document processing and investor communications.
+**Tech Stack:** React, TypeScript, Azure, AWS, Jenkins.
+
+---
+## PROJECT 9: Euro Garages Integration Platform (Enterprise)
+**Description:** An integration platform for a large forecourt and food-to-go operator, connecting systems from Shell, ESSO, BP, Starbucks, Subway, Burger King and NCR across the UK and Woolworths Australia.
+**Tech Stack:** AWS, React, Node.js.
+
+---
+## PROJECT 10: Admiralty H-Note App (UKHO / MoD) (Enterprise)
+**Description:** A hydrographic data app for mariners, built for the UK Hydrographic Office within the Ministry of Defence. Delivered as an Angular application for iOS and Android with a Node.js backend.
+**Tech Stack:** Angular, iOS, Android, Node.js.
+
+---
+## PROJECT 11: Ministry of Defence Portal (Enterprise)
+**Description:** A front-end portal for the Ministry of Defence with search clustering over large document collections. Built in AngularJS on a Lucene and Solr search layer with Cassandra storage.
+**Tech Stack:** AngularJS, Lucene, Solr, Cassandra.
+
+---
+## PROJECT 12: National Grid Dashboard (Enterprise)
+**Description:** A weather schematic dashboard for National Grid, turning weather data into operational visualisations. Built with D3.js and Angular, offering 24 chart types.
+**Tech Stack:** D3.js, Angular.
+
+---
+## PROJECT 13: Booking.com / Rental Cars Cloud Migration (Enterprise)
+**Description:** Cloud migration for Booking.com and Rental Cars, moving services onto Google Cloud. Defined the infrastructure as code in Terraform and ran workloads on Kubernetes.
+**Tech Stack:** GCP, Terraform, Kubernetes.
+
+---
+## PROJECT 14: NHS Cloud Infrastructure (Enterprise)
+**Description:** Cloud infrastructure and migration work for the NHS. Built the environments as code with Terraform on AWS, containerised services with Docker.
+**Tech Stack:** AWS, Terraform, Docker.
+
+---
+## PROJECT 15: Blockchain Health Platform (Healthcare)
+**Description:** A blockchain-based medical data platform for a health-tech startup. Smart contracts govern how medical data is shared and recorded, giving an auditable trail.
+**Tech Stack:** Blockchain, React, Node.js, PostgreSQL.
+
+---
+## PROJECT 16: Patient Medication Tracker (Healthcare)
+**Description:** A patient medication-tracking app for a Fortune 500 pharmaceutical company, published on Google Play.
+**Tech Stack:** React Native, iOS, Android.
+
+---
+## PROJECT 17: GSK Hepatitis B App (Healthcare)
+**Description:** A native medical app for GSK on the subject of Hepatitis B, delivered for iOS and Android.
+**Tech Stack:** iOS, Android.
+
+---
+## PROJECT 18: Teapro (E-commerce)
+**Description:** A global e-commerce platform for a tea brand. A Shopify store extended with React and Node.js.
+**Tech Stack:** React, Node.js, Shopify.
+
+---
+## PROJECT 19: Honey Berry (E-commerce)
+**Description:** An e-commerce platform for an organic jam brand, with social media integration built into the shopping experience.
+**Tech Stack:** React, Node.js, Shopify.
+
+---
+## PROJECT 20: Fashion E-commerce Platform (E-commerce)
+**Description:** An e-commerce platform for a major UK fashion retailer. Built front-end and service components in React and Node.js.
+**Tech Stack:** React, Node.js.
+
+---
+## PROJECT 21: Family Shopping-List App (E-commerce)
+**Description:** A shopping-list app with family sharing, built for a Baltic retail chain.
+**Tech Stack:** React Native, iOS, Android.
+
+---
+## PROJECT 22: BMM (Book My MOT) (E-commerce)
+**Description:** An online booking platform for MOT tests, connecting motorists with garages.
+**Tech Stack:** React, Node.js, AWS.
+
+---
+## PROJECT 23: Mechanic App (E-commerce)
+**Description:** A platform that connects customers with mechanics.
+**Tech Stack:** React, Node.js.
+
+---
+## PROJECT 24: Portevo (Marketplace)
+**Description:** A consultant marketplace that matches clients with consultants algorithmically, scoring fit across 150+ data points.
+**Tech Stack:** React, Node.js, Python, AWS.
+
+---
+## PROJECT 25: Hampshire iPad App (Mobile Apps)
+**Description:** A real-estate iPad app for browsing property listings on a large touch screen.
+**Tech Stack:** Xcode, XML.
+
+---
+## PROJECT 26: Accu-Mile (Mobile Apps)
+**Description:** A mileage and expense tracking app for iOS.
+**Tech Stack:** Xcode, iOS.
+
+---
+## PROJECT 27: 10x Maastricht (Mobile Apps)
+**Description:** A GPS-enabled travel guide app for the city of Maastricht.
+**Tech Stack:** Xcode, PHP.
+
+---
+## PROJECT 28: Kosair Charities (Mobile Apps)
+**Description:** An awareness app for Kosair Charities, a US non-profit.
+**Tech Stack:** Xcode, iOS.
+
+---
+## PROJECT 29: Buzzshare (Mobile Apps)
+**Description:** An events discovery app that helps people find and share events.
+**Tech Stack:** Xcode, PHP.
+
+---
+## PROJECT 30: Beeblio-Me (Mobile Apps)
+**Description:** A book-reading app for Android.
+**Tech Stack:** Android, J2ME.
+
+---
+## PROJECT 31: Yatzer (Mobile Apps)
+**Description:** An article-reading app for Android.
+**Tech Stack:** Android, J2ME.
+
+---
+## PROJECT 32: Fweebi (Mobile Apps)
+**Description:** A shopping app for the Greek market with map integration.
+**Tech Stack:** Android, J2ME, Maps.
+
+---
+## PROJECT 33: Sports Event Fan App (Mobile Apps)
+**Description:** A fan app for a major US sports event.
+**Tech Stack:** Android, J2ME.
+
+---
+## PROJECT 34: Buddy Alert (Mobile Apps)
+**Description:** A personal safety app for sending alerts to trusted contacts.
+**Tech Stack:** Android, J2ME.
+
+---
+## PROJECT 35: Politic.fr (Mobile Apps)
+**Description:** A political chat app for France.
+**Tech Stack:** Android, J2ME.
+
+---
+## PROJECT 36: Menu Spring (Mobile Apps)
+**Description:** A restaurant menu search app.
+**Tech Stack:** iOS, Android.
+
+---
+## PROJECT 37: Orchid Field Marketing (Mobile Apps)
+**Description:** An event management app for a field-marketing agency.
+**Tech Stack:** BlackBerry, iOS, Android.
+
+---
+## PROJECT 38: Plan My Olympics (Mobile Apps)
+**Description:** An Android app for planning visits to the London 2012 Olympic Games.
+**Tech Stack:** Android.
+
+---
+## PROJECT 39: Concert Ticket App (Mobile Apps)
+**Description:** A concert ticket app for a leading UK telecoms provider.
+**Tech Stack:** Android.
+
+---
+## PROJECT 40: Str8ts (Games)
+**Description:** A Sudoku-style number puzzle game for iOS.
+**Tech Stack:** Cocos2D, iOS.
+
+---
+## PROJECT 41: Battle of Atlantic (Games)
+**Description:** A WWII naval strategy game for iOS.
+**Tech Stack:** Cocos2D, iOS.
+
+---
+## PROJECT 42: Impulse (Games)
+**Description:** A card-based party game for iOS.
+**Tech Stack:** Xcode, iOS.
+
+---
+## PROJECT 43: Department Store Website (Web & Other)
+**Description:** A responsive website for a US department store chain.
+**Tech Stack:** HTML5, CSS3.
+
+---
+## PROJECT 44: Discover Varmints (Web & Other)
+**Description:** A parallax-scrolling website.
+**Tech Stack:** Web Technologies.
+
+---
+## PROJECT 45: Honey Berry Website (Web & Other)
+**Description:** The e-commerce website for an organic jam brand, built on Shopify.
+**Tech Stack:** Shopify.

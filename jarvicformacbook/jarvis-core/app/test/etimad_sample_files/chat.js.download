@@ -1,0 +1,204 @@
+(function () {
+  'use strict';
+
+  function launchBtn(options) {
+    var mainBtn = document.querySelector('.st-button-main');
+    var labelBtn = document.querySelector('.st-button-lable');
+    var containerBtn = document.querySelector('.st-btn-container');
+    var closeBtn = document.getElementById('CloseBtn');
+    var panel = document.querySelector('.st-panel') || document.querySelector('.st-panel-disable');
+    var clicks = 0;
+
+    var settings = Object.assign(
+      {
+        openDuration: 600,
+        closeDuration: 200,
+        rotate: true,
+      },
+      options,
+    );
+
+    function animateElement(element, action) {
+      if (element) {
+        element.style.transition = 'opacity ' + settings.openDuration + 'ms, height ' + settings.openDuration + 'ms';
+        if (action === 'show') {
+          element.style.opacity = '1';
+          element.style.height = 'auto';
+        } else {
+          element.style.opacity = '0';
+          element.style.height = '0';
+        }
+      }
+    }
+
+    function launchPanelAnim() {
+      animateElement(panel, 'show');
+      animateElement(containerBtn, 'show');
+    }
+
+    function closePanelAnim() {
+      animateElement(panel, 'hide');
+      animateElement(containerBtn, 'hide');
+    }
+
+    function openPanel(e) {
+      if (clicks === 0) {
+        launchPanelAnim();
+        clicks++;
+      } else {
+        closePanelAnim();
+        clicks--;
+      }
+      e.preventDefault();
+    }
+
+    function boxClick(e) {
+      e.stopPropagation();
+    }
+
+    if (mainBtn) mainBtn.addEventListener('click', openPanel);
+    if (labelBtn) labelBtn.addEventListener('click', openPanel);
+    if (panel) panel.addEventListener('click', boxClick);
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        closePanelAnim();
+        if (typeof lastActive !== 'undefined') {
+          lastActive = null;
+        }
+        clicks = 0;
+      });
+    }
+  }
+
+  function deriveBaseUrl(src) {
+    try {
+      var url = new URL(src);
+      return url.protocol + '//' + url.host;
+    } catch (e) {
+      var match = src.match(/^(https?:\/\/[^\/]+)/);
+      return match ? match[1] : '';
+    }
+  }
+
+  function deriveChatConfigPaths(src) {
+    var baseUrl = deriveBaseUrl(src);
+    if (!baseUrl) {
+      return null;
+    }
+
+    return {
+      cssPath: baseUrl + '/assets/styles/live-chat.css',
+       logoSrc: baseUrl + '/Etimad-UI/assets/imgs/Logo-main.svg',
+       liveChatIconSrc: baseUrl + '/Etimad-UI/assets/imgs/live-chat.svg',
+    };
+  }
+
+  function createChatInterface(config) {
+    var rtl = config.rtl || false;
+    var chatUrl = config.chatUrl || 'https://chat.uniithra.com.sa/mof/general/clientlogin_etimad';
+    var chatUrl = config.chatUrl || 'https://chat.uniithra.com.sa/mof/general/clientlogin_etimad';
+    var language = config.language || 'en';
+
+    // Get current script source to derive paths
+    var currentScript = document.currentScript || document.querySelector('script[src*="chat.js"]');
+    var scriptSrc = currentScript ? currentScript.src : '';
+    var configPaths = deriveChatConfigPaths(scriptSrc);
+
+     var logoSrc = config.logoSrc || (configPaths ? configPaths.logoSrc : '/Etimad-UI/assets/imgs/Logo-main.svg');
+     var liveChatIconSrc = config.liveChatIconSrc || (configPaths ? configPaths.liveChatIconSrc : '/Etimad-UI/assets/imgs/live-chat.svg');
+     var companyName = config.companyName || 'اعتماد' //(rtl ? 'اعتماد' : 'Etimad');
+
+    var responseHtml =
+      '<div class="st-actionContainer right-bottom">' +
+      '<div class="st-panel">' +
+      '<div class="st-panel-header text-center" style="text-align: center;font-weight: bold;">' +
+      '<img class="pull-right" alt="pull-right" style="background-color:white;max-height:28px" src="' +
+      logoSrc +
+      '" />' +
+      '<label style="line-height: 28px;">' +
+      companyName +
+      '</label>' +
+      '<em id="CloseBtn" class="pull-left icon-clearclose" style="cursor: pointer;"><svg xmlns="http://www.w3.org/2000/svg" width="22px" height="22px" viewBox="0 0 16 16"> <path d="M4.795 3.912l-.883.883.147.146L7.117 8 4.06 11.059l-.147.146.883.883.146-.147L8 8.883l3.059 3.058.146.147.883-.883-.147-.146L8.883 8l3.058-3.059.147-.146-.883-.883-.146.147L8 7.117 4.941 4.06z" style="line-height:normal;font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-feature-settings:normal;text-indent:0;text-align:start;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:#000000;text-transform:none;text-orientation:mixed;shape-padding:0;isolation:auto;mix-blend-mode:normal" color="#000000" font-weight="400" font-family="sans-serif" white-space="normal" overflow="visible" fill="gray" fill-rule="evenodd"/> </svg></em>' +
+      '</div>' +
+      '<div class="My-grid">' +
+      '<iframe id="iFrame" src="' +
+      chatUrl +
+      '?lang=' +
+      language +
+      '" width="100%" height="100%"></iframe>' +
+      '</div>' +
+      '</div>' +
+      '<div class="st-btn-container right-bottom" data-toggle="tooltip" title="تواصل معنا">' +
+      '<div class="st-button-main">' +
+      '<img alt="Live Chat" src="' +
+      liveChatIconSrc +
+      '"  />' +
+      '</div>' +
+      '</div>' +
+      '</div>';
+
+    document.body.insertAdjacentHTML('beforeend', responseHtml);
+
+    var frame = document.getElementById('iFrame');
+    if (frame) {
+      frame.addEventListener('load', function () {
+        frame.contentWindow.postMessage('hideElement', '*');
+      });
+    }
+
+    launchBtn();
+  }
+
+  // Export for use in other modules
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { createChatInterface, launchBtn };
+  } else if (typeof window !== 'undefined') {
+    window.NCGRChat = { createChatInterface, launchBtn };
+  }
+
+  // Auto-initialize whether the script loads before or after DOMContentLoaded
+  var initialized = false;
+  function initChat() {
+    if (initialized) return;
+    initialized = true;
+
+    // Check if there's a global chat config
+    if (typeof window !== 'undefined' && window.ncgrChatConfig) {
+      createChatInterface(window.ncgrChatConfig);
+      return;
+    }
+
+    // Fallback to original behavior with localStorage
+    var rtl = false;
+    var language = 'ar';
+
+    try {
+      var session = JSON.parse(localStorage.getItem('abpSession'));
+      if (session) {
+        rtl = session.language === 'ar';
+        language = session.language;
+      }
+    } catch (e) {
+      console.warn('Could not parse abpSession from localStorage');
+    }
+
+    // Get current script source to derive paths
+    var currentScript = document.currentScript || document.querySelector('script[src*="chat.js"]');
+    var scriptSrc = currentScript ? currentScript.src : '';
+    var configPaths = deriveChatConfigPaths(scriptSrc);
+
+    createChatInterface({
+      rtl: rtl,
+      language: language,
+      logoSrc: configPaths ? configPaths.logoSrc : undefined,
+      liveChatIconSrc: configPaths ? configPaths.liveChatIconSrc : undefined,
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initChat);
+  } else {
+    initChat();
+  }
+})();

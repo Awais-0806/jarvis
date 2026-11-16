@@ -1,0 +1,26 @@
+# Jarvis Core production runtime dependencies.
+#
+# Ranges (not exact pins) because crewai pins many transitive packages itself
+# (including chromadb and pydantic); pinning them independently here causes
+# resolver conflicts. After the first successful build, freeze a lock file:
+#   docker compose run --rm core pip freeze > requirements.lock
+# and switch the Dockerfile to install from requirements.lock for
+# reproducible builds.
+
+# --- API ---
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.29,<1.0
+pydantic>=2.7,<3.0
+# Multipart parsing for the voice proxy's UploadFile endpoint (/api/voice/transcribe).
+python-multipart>=0.0.9,<1.0
+
+# --- Agents / memory ---
+crewai>=0.80,<2.0
+chromadb>=0.5,<2.0
+
+# --- Scrapers ---
+# HTML parsing for app/scrapers (uses the stdlib html.parser backend, no lxml).
+# httpx (used for fetching) is already pulled in by crewai.
+beautifulsoup4>=4.12,<5.0
+
+# Test tools (pytest, httpx) live in requirements-dev.txt.

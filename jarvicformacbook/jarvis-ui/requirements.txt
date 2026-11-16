@@ -1,0 +1,5 @@
+# Jarvis UI (CEO dashboard) runtime dependencies.
+# Ranges for now; freeze to requirements.lock after the first verified build (same as jarvis-core).
+streamlit>=1.40,<2.0
+httpx>=0.27,<1.0
+pandas>=2.2,<4.0
