@@ -4,8 +4,8 @@ RAG setup for the CEO profile (CV + portfolio notes) in ChromaDB.
 What it does:
 - ``ingest()`` reads every ``.txt``/``.md`` file in the knowledge directory (default
   ``app/knowledge/``, e.g. ``boss_cv.txt``), splits it into one chunk per project / role /
-  section, embeds the chunks with the local Ollama embedding model and stores them in a
-  persistent ChromaDB collection under ``CHROMA_PERSIST_DIR``.
+  section, embeds the chunks with the configured backend (Ollama, OpenAI or the offline
+  fallback) and stores them in a persistent ChromaDB collection under ``CHROMA_PERSIST_DIR``.
 - ``retrieve(query)`` embeds a tender brief and returns the best-matching chunks (projects
   first) with a 0..1 similarity score. It ingests on first use if the collection is empty,
   so no manual step is needed after a rebuild.
@@ -21,14 +21,21 @@ Run by hand (inside the core container):
     python -m app.rag_setup --query "smart building IoT energy"
  
 Design notes:
+- Embeddings come from a backend chosen by ``EMBED_PROVIDER`` (or automatically):
+  cloud (``IS_CLOUD=true``) uses ``openai``/``text-embedding-3-small`` when ``OPENAI_API_KEY``
+  is set, and otherwise the offline ``hash`` fallback so the server always starts; local runs use
+  ``ollama``/``nomic-embed-text`` exactly as before. ``groq`` maps to the fallback because Groq
+  serves no embeddings.
 - Embeddings are computed here and passed to ChromaDB explicitly. ChromaDB's default embedding
   function downloads an ONNX model, and ``backend`` has no internet (CLAUDE.md section 5).
 - Ollama is called with the standard library (``urllib``), so no new dependency is needed, and
-  with proxies disabled: Ollama is an internal service and must never go through Squid.
+  with proxies disabled: Ollama is an internal service and must never go through Squid. The
+  OpenAI call uses the same stdlib client (with the environment proxy, as it is an external API).
 - Vectors are L2-normalised before storage, so ChromaDB's default (squared L2) distance ranks
   exactly like cosine similarity and ``score = 1 - distance / 2``.
-- The collection name includes the embedding model. Changing ``EMBED_MODEL`` therefore starts a
-  fresh collection instead of mixing vector sizes (CLAUDE.md: treat it as a migration).
+- The collection name includes the embedding backend/model. Changing ``EMBED_MODEL``,
+  ``EMBED_PROVIDER`` or the provider's default therefore starts a fresh collection instead of
+  mixing vector sizes (CLAUDE.md: treat it as a migration).
 - The lines above the first section heading of a CV (name, phone, e-mail, links) are NOT
   indexed: contact details have no business in a prompt or a generated pitch.
 - ``chromadb`` is imported lazily so the API starts fast and host tests run without it.
@@ -57,9 +64,14 @@ MAX_FILE_BYTES = 512_000
 MAX_CHUNK_CHARS = 1000
 MAX_CHUNKS = 400
 EMBED_BATCH = 16
-# Covers Ollama unloading the chat model and loading the embedding model on CPU.
+# Covers Ollama unloading the chat model and loading the embedding model on CPU, or a slow
+# embedding API response.
 EMBED_TIMEOUT_S = 180.0
 DEFAULT_SUBJECT = "our CEO"
+
+# Cloud deployment (Railway): no Ollama container, so embeddings come from a cloud API or the
+# offline fallback. Kept in step with app.crew_factory.IS_CLOUD.
+IS_CLOUD = os.environ.get("IS_CLOUD", "false").strip().lower() == "true"
 
 # --- Context collections -----------------------------------------------------------------------
 # The CEO profile / pitch knowledge stays in its own collection; the three memory contexts are
@@ -134,16 +146,55 @@ def _ollama_url() -> str:
  
  
 def _embed_model() -> str:
-    return os.environ.get("EMBED_MODEL", "nomic-embed-text")
- 
- 
+    """Model name for the active backend (``EMBED_MODEL`` overrides)."""
+    configured = (os.environ.get("EMBED_MODEL") or "").strip()
+    if configured:
+        return configured
+    return "text-embedding-3-small" if _embed_provider() == "openai" else "nomic-embed-text"
+
+
+# --- Embedding backend ---------------------------------------------------------------------------
+# Groq serves no embeddings, and the cloud demo has no Ollama. These values select the offline
+# fallback: deterministic hashed bag-of-words vectors. It is a lexical match (shared words score
+# higher), not a semantic one, but every retrieval path keeps working without a network.
+HASH_EMBED_PROVIDERS = frozenset({"hash", "groq", "mock", "none"})
+HASH_EMBED_DIM = 512
+DEFAULT_EMBED_PROVIDER = "ollama"
+_TOKEN_RE = re.compile(r"[a-z0-9]+")
+_hash_notice_logged = False
+
+
+def _embed_provider() -> str:
+    """Embedding backend name.
+
+    ``EMBED_PROVIDER`` wins when set. Otherwise: cloud uses ``openai`` if ``OPENAI_API_KEY`` is
+    present and the offline ``hash`` fallback if not (so startup never fails on a missing key);
+    local keeps ``ollama``.
+    """
+    configured = (os.environ.get("EMBED_PROVIDER") or "").strip().lower()
+    if configured:
+        return configured
+    if IS_CLOUD:
+        return "openai" if (os.environ.get("OPENAI_API_KEY") or "").strip() else "hash"
+    return DEFAULT_EMBED_PROVIDER
+
+
+def _uses_hash_embeddings() -> bool:
+    return _embed_provider() in HASH_EMBED_PROVIDERS
+
+
+def _embed_signature() -> str:
+    """Short name that identifies the vector space, used in collection names."""
+    return "hash" if _uses_hash_embeddings() else _embed_model()
+
+
 def collection_name(base: str = PROFILE_COLLECTION) -> str:
     """ChromaDB collection name for ``base`` (``ceo-profile``, ``email_memory``, ...).
 
-    The embedding model is part of the name: changing ``EMBED_MODEL`` starts a fresh collection
-    instead of mixing vectors of different sizes.
+    The embedding backend is part of the name: changing ``EMBED_MODEL`` or ``EMBED_PROVIDER``
+    starts a fresh collection instead of mixing vectors of different sizes.
     """
-    model = re.sub(r"[^A-Za-z0-9]+", "-", _embed_model()).strip("-") or "default"
+    model = re.sub(r"[^A-Za-z0-9]+", "-", _embed_signature()).strip("-") or "default"
     safe_base = re.sub(r"[^A-Za-z0-9_-]+", "-", base).strip("-") or PROFILE_COLLECTION
     return f"{safe_base}-{model}"[:60].rstrip("-")
 
@@ -356,19 +407,78 @@ def load_chunks() -> list[Chunk]:
             for c in chunks[:MAX_CHUNKS]]
  
  
-# --- Embeddings (Ollama) -----------------------------------------------------------------------
+# --- Embeddings (Ollama, OpenAI, or the offline hashed fallback) --------------------------------
 def _normalise(vector: Any) -> list[float]:
     if not isinstance(vector, list) or not vector:
-        raise ProfileStoreError("Ollama returned an invalid embedding")
+        raise ProfileStoreError("The embedding backend returned an invalid embedding")
     values = [float(v) for v in vector]
     norm = math.sqrt(sum(v * v for v in values))
     if not math.isfinite(norm) or norm == 0.0:
-        raise ProfileStoreError("Ollama returned an invalid embedding")
+        raise ProfileStoreError("The embedding backend returned an invalid embedding")
     return [v / norm for v in values]
- 
- 
+
+
+def _hash_embed(text: str) -> list[float]:
+    """Deterministic bag-of-words vector: hashed token counts, L2-normalised.
+
+    A lexical fallback for deployments with neither Ollama nor an embedding API (the 1 GB cloud
+    demo). Documents sharing words with the query score higher; there is no semantic meaning to
+    the directions. It must stay deterministic across processes, so hashlib is used (Python's
+    ``hash`` is salted per process).
+    """
+    vector = [0.0] * HASH_EMBED_DIM
+    for token in _TOKEN_RE.findall(text.lower()):
+        digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest()
+        index = int.from_bytes(digest[:4], "big") % HASH_EMBED_DIM
+        vector[index] += 1.0 if digest[4] & 1 else -1.0
+    return _normalise(vector)
+
+
+def _openai_embed(texts: list[str]) -> list[list[float]]:
+    """Embed texts with the OpenAI embeddings API (one stdlib HTTP call per batch, no SDK)."""
+    key = (os.environ.get("OPENAI_API_KEY") or "").strip()
+    if not key:
+        raise ProfileStoreError(
+            "OPENAI_API_KEY is not set; set EMBED_PROVIDER=hash for the offline fallback"
+        )
+    base = (os.environ.get("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
+    body = json.dumps({"model": _embed_model(), "input": texts}).encode("utf-8")
+    request = urllib.request.Request(  # noqa: S310 - default is https
+        f"{base}/embeddings", data=body, method="POST",
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+    )
+    try:
+        # Unlike Ollama, this is an external API, so the environment proxy is allowed.
+        with urllib.request.urlopen(request, timeout=EMBED_TIMEOUT_S) as response:
+            payload = json.load(response)
+    except urllib.error.HTTPError as exc:
+        logger.error("OpenAI embedding call failed: HTTP %d", exc.code)
+        raise ProfileStoreError("The OpenAI embedding request was rejected") from exc
+    except (OSError, ValueError) as exc:
+        logger.error("OpenAI embedding call failed: %s", exc.__class__.__name__)
+        raise ProfileStoreError("Could not reach the OpenAI embedding API") from exc
+    items = payload.get("data") if isinstance(payload, dict) else None
+    if (not isinstance(items, list) or len(items) != len(texts)
+            or not all(isinstance(item, dict) for item in items)):
+        raise ProfileStoreError("OpenAI returned an unexpected embedding response")
+    ordered = sorted(items, key=lambda item: int(item.get("index", 0)))
+    return [_normalise(item.get("embedding")) for item in ordered]
+
+
 def _embed(texts: list[str]) -> list[list[float]]:
-    """Embed texts with the Ollama embedding model; returns unit-length vectors."""
+    """Embed texts with the configured backend; returns unit-length vectors."""
+    global _hash_notice_logged
+    if _uses_hash_embeddings():
+        if not _hash_notice_logged:
+            logger.info("Embeddings: offline hashed fallback (EMBED_PROVIDER=%s); "
+                        "lexical match only, no semantic model", _embed_provider())
+            _hash_notice_logged = True
+        return [_hash_embed(text) for text in texts]
+    if _embed_provider() == "openai":
+        vectors: list[list[float]] = []
+        for start in range(0, len(texts), EMBED_BATCH):
+            vectors.extend(_openai_embed(texts[start:start + EMBED_BATCH]))
+        return vectors
     vectors: list[list[float]] = []
     for start in range(0, len(texts), EMBED_BATCH):
         batch = texts[start:start + EMBED_BATCH]
@@ -395,12 +505,18 @@ def _embed(texts: list[str]) -> list[list[float]]:
  
  
 # nomic-embed-text is trained with task prefixes; using them measurably improves retrieval.
+# The hashed fallback and OpenAI embeddings do not use them.
+def _uses_task_prefixes() -> bool:
+    return _embed_provider() == "ollama"
+
+
 def _doc_text(chunk: Chunk) -> str:
-    return f"search_document: {chunk.title} ({chunk.section})\n{chunk.text}"
- 
- 
+    text = f"{chunk.title} ({chunk.section})\n{chunk.text}"
+    return f"search_document: {text}" if _uses_task_prefixes() else text
+
+
 def _query_text(query: str) -> str:
-    return f"search_query: {query}"
+    return f"search_query: {query}" if _uses_task_prefixes() else query
  
  
 # --- ChromaDB ----------------------------------------------------------------------------------

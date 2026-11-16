@@ -18,6 +18,9 @@ python-multipart>=0.0.9,<1.0
 
 # --- Agents / memory ---
 crewai>=0.80,<2.0
+# CrewAI routes "groq/..." model ids through litellm. The cloud demo uses Groq instead of a
+# local Ollama model (1 GB container), so the provider layer must be installed in the image.
+litellm>=1.40,<2.0
 chromadb>=0.5,<2.0
 # Daily 08:00 morning briefing. BackgroundScheduler runs in the core process; no broker or
 # extra service is needed. tzlocal is APScheduler's timezone dependency (pinned in the lock).

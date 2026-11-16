@@ -70,6 +70,21 @@ CONTEXT_WINDOW_TOKENS = 4096
 # Cloud deployment (Railway): no Windows laptop, no host bridge. The host tools are removed
 # from the crew so the model cannot offer desktop control or WhatsApp it cannot deliver.
 IS_CLOUD = os.environ.get("IS_CLOUD", "false").strip().lower() == "true"
+
+# --- LLM provider: local Ollama, or a cloud API (Groq / OpenRouter) -------------------------------
+# The cloud demo runs in ~1 GB, where Ollama cannot load a model, so ``IS_CLOUD=true`` selects a
+# hosted provider instead: ``LLM_PROVIDER`` is ``groq`` (default) or ``openrouter``, each with its
+# own key. Both are reached through litellm ("groq/..." and "openrouter/..." model ids).
+# Model ids are overridable because both services retire free models regularly:
+#   - Groq no longer serves llama3-70b-8192 / llama3-8b-8192, and its Llama models are listed as
+#     enterprise, so the default is the GPT-OSS 20B model on the developer plan.
+#   - OpenRouter no longer lists meta-llama/llama-3-8b-instruct:free; the default is a current
+#     free model that supports tool calling.
+# Override with GROQ_MODEL / OPENROUTER_MODEL to use whatever your key can reach.
+GROQ_DEFAULT_MODEL = "openai/gpt-oss-20b"
+GROQ_CONTEXT_WINDOW_TOKENS = 131_072
+OPENROUTER_DEFAULT_MODEL = "google/gemma-4-31b-it:free"
+OPENROUTER_CONTEXT_WINDOW_TOKENS = 131_072
  
 # Pitch pipeline budget. Two LLM calls share one 900 s job: each agent is capped so that
 # retrieval + match + pitch finish before the job store abandons the job.
@@ -794,21 +809,42 @@ def _ollama_url() -> str:
  
 def _manager_model() -> str:
     return os.environ.get("MANAGER_MODEL", "qwen2.5:7b")
- 
- 
+
+
+def _groq_model() -> str:
+    return (os.environ.get("GROQ_MODEL") or "").strip() or GROQ_DEFAULT_MODEL
+
+
+def _openrouter_model() -> str:
+    return (os.environ.get("OPENROUTER_MODEL") or "").strip() or OPENROUTER_DEFAULT_MODEL
+
+
+def _llm_provider() -> str:
+    """Cloud provider name from ``LLM_PROVIDER`` (``groq`` or ``openrouter``; default groq)."""
+    return (os.environ.get("LLM_PROVIDER") or "groq").strip().lower() or "groq"
+
+
+def _provider_api_key(env_name: str) -> str:
+    """Read a provider key per call so a rotated key needs no restart."""
+    key = (os.environ.get(env_name) or "").strip()
+    if not key:
+        raise CrewError(f"{env_name} is not set (cloud mode uses {_llm_provider()} for the model)")
+    return key
+
+
+def _groq_api_key() -> str:
+    return _provider_api_key("GROQ_API_KEY")
+
+
+def _openrouter_api_key() -> str:
+    return _provider_api_key("OPENROUTER_API_KEY")
+
+
 def _kickoff(message: str) -> str:
     """Build the chat crew, run it once, and return the raw text output."""
-    from crewai import LLM, Agent, Crew, Process, Task
- 
-    llm = LLM(
-        model=f"ollama/{_manager_model()}",
-        base_url=_ollama_url(),
-        temperature=0.3,
-        timeout=LLM_TIMEOUT_S,
-        max_tokens=MAX_OUTPUT_TOKENS,
-        # Ollama's default num_ctx; CrewAI would otherwise guess 8192 and warn on every run.
-        context_window_size=CONTEXT_WINDOW_TOKENS,
-    )
+    from crewai import Agent, Crew, Process, Task
+
+    llm = _build_llm(MAX_OUTPUT_TOKENS)
     global_tool = _as_tool(fetch_global_tenders)
     host_tool = _as_tool(control_host_computer)
     whatsapp_tool = _as_tool(send_whatsapp_message)
@@ -1015,14 +1051,39 @@ def run_crew(message: str) -> str:
  
 # --- Tender pitch pipeline: Global Matchmaker + Bid Writer ---------------------------------------
 def _build_llm(max_tokens: int) -> Any:
+    """LLM for this deployment: the cloud provider when IS_CLOUD, local Ollama otherwise."""
     from crewai import LLM
- 
+
+    if IS_CLOUD:
+        provider = _llm_provider()
+        if provider == "openrouter":
+            return LLM(
+                model=f"openrouter/{_openrouter_model()}",
+                api_key=_openrouter_api_key(),
+                temperature=0.3,
+                timeout=LLM_TIMEOUT_S,
+                max_tokens=max_tokens,
+                context_window_size=OPENROUTER_CONTEXT_WINDOW_TOKENS,
+            )
+        if provider == "groq":
+            return LLM(
+                model=f"groq/{_groq_model()}",
+                api_key=_groq_api_key(),
+                temperature=0.3,
+                timeout=LLM_TIMEOUT_S,
+                max_tokens=max_tokens,
+                context_window_size=GROQ_CONTEXT_WINDOW_TOKENS,
+            )
+        raise CrewError(
+            f"Unknown LLM_PROVIDER {provider!r}. Use 'groq' or 'openrouter'."
+        )
     return LLM(
         model=f"ollama/{_manager_model()}",
         base_url=_ollama_url(),
         temperature=0.3,
         timeout=LLM_TIMEOUT_S,
         max_tokens=max_tokens,
+        # Ollama's default num_ctx; CrewAI would otherwise guess 8192 and warn on every run.
         context_window_size=CONTEXT_WINDOW_TOKENS,
     )
  
