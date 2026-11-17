@@ -1,19 +1,4 @@
 # Jarvis edge - cloud variant of nginx.conf.
-#
-# Railway (and most PaaS) inject a PORT and route traffic to that port, so this file is a
-# template rendered by the edge container at start-up:
-#     envsubst '${PORT} ${CORE_UPSTREAM} ${UI_UPSTREAM}' \
-#         < /etc/nginx/templates/nginx.conf.template > /tmp/nginx.conf
-#
-# Upstreams are rendered as literals on purpose: nginx then resolves them once via the
-# container's system resolver, which works with Docker's embedded DNS locally and with
-# Railway private networking (IPv6) in the cloud. If a platform uses different service
-# names (for example <service>.railway.internal), override CORE_UPSTREAM / UI_UPSTREAM.
-# nginx exits if a name cannot be resolved; restart: unless-stopped retries until the
-# upstream services exist.
-#
-# Everything else matches jarvis-docker/nginx.conf: the React UI container injects the bearer
-# token server-side, so /api/* must go to ui, never straight to core.
 worker_processes 1;
 pid /tmp/nginx.pid;
 error_log /dev/stderr warn;
@@ -40,6 +25,9 @@ http {
     sendfile on;
     keepalive_timeout 30s;
 
+    # Railway (Docker) ke internal DNS ka use karke dynamic IP resolve karein
+    resolver 127.0.0.11 valid=10s ipv6=on;
+
     map $http_upgrade $connection_upgrade {
         default upgrade;
         ''      close;
@@ -56,7 +44,9 @@ http {
         add_header Content-Security-Policy "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'" always;
 
         location /ws/ {
-            proxy_pass http://${CORE_UPSTREAM};
+            # Variable use karne se Nginx har baar naya IP dhoondta hai
+            set $core_upstream http://${CORE_UPSTREAM};
+            proxy_pass $core_upstream$request_uri;
             proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection $connection_upgrade;
@@ -66,7 +56,8 @@ http {
 
         # Everything else -> React UI (SPA + /api proxy that injects the token)
         location / {
-            proxy_pass http://${UI_UPSTREAM};
+            set $ui_upstream http://${UI_UPSTREAM};
+            proxy_pass $ui_upstream$request_uri;
             proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection $connection_upgrade;
